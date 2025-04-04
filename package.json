@@ -1,0 +1,38 @@
+{
+  "name": "notecard-mcp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "bin": {
+    "notecard": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && node -e \"require('fs').chmodSync('build/index.js', '755')\"",
+    "start": "node -r dotenv/config build/index.js dotenv_config_path=.env",
+    "package": "npm run build && pkg ."
+  },
+  "files": [
+    "build"
+  ],
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@types/axios": "^0.9.36",
+    "@types/cheerio": "^0.22.35",
+    "@types/node": "^22.10.0",
+    "typescript": "^5.7.2"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.4.0",
+    "axios": "^1.8.4",
+    "cheerio": "^1.0.0",
+    "dotenv": "^16.4.5",
+    "serialport": "^13.0.0"
+  },
+  "pkg": {
+    "scripts": "build/**/*.js",
+    "targets": [ "node18-linux-x64", "node18-macos-x64", "node18-win-x64" ],
+    "outputPath": "bin"
+  }
+}
