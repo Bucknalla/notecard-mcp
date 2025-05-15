@@ -10,6 +10,7 @@ import * as path from 'path';
 import * as os from 'os';
 import { fileURLToPath } from 'url';
 import { findFirmwareUrl, listAvailableFirmwareVersions, getNotecardTypeFromModel } from './firmware.js';
+import { validateNotecardRequest } from './schema.js';
 
 const execAsync = promisify(exec);
 let discoveredNotecardPort: string | null = null;
@@ -38,44 +39,21 @@ server.prompt(
   })
 );
 
-// // --- Calculate Paths for Resources ---
-// const __filename = fileURLToPath(import.meta.url);
-// const __dirname = path.dirname(__filename);
-// const distDir = path.join(__dirname, '..', 'dist'); // Assumes dist is one level up from src
-// const apiFilePath = path.join(distDir, 'notecard-apis.json');
-// // --- End Calculate Paths ---
-
-// server.resource(
-//   "notecard-apis",
-//   "notecard-apis.json", // Filename hint
-//   async (context: any) => {
-//     try {
-//       // Read the JSON file content
-//       const fileContent = await fs.readFile(apiFilePath, 'utf-8');
-//       // Return the content in the expected structure
-//       return {
-//         contents: [
-//           {
-//             text: fileContent,
-//             uri: "notecard-apis.json", // Use filename hint as URI
-//             mimeType: 'application/json' // Specify MIME type here
-//           }
-//         ]
-//       };
-//     } catch (error: any) {
-//       console.error(`Error reading resource ${apiFilePath}:`, error);
-//       // Re-throw the error to let the framework handle the 500 response
-//       throw error;
-//     }
-//   }
-// );
-
 server.tool(
   "notecard-find-port",
-  "Scans for connected serial devices with the Notecard VID (30a4), stores the port, and returns it. You should make sure to check for available APIs before trying to use other tools.",
-  {},
-  async (_input: {}) => {
+  "Scans for connected serial devices with the Notecard VID (30a4) and stores the port, or uses a specified port if provided. If a port is specified, VID checks are skipped. You should make sure to check for available APIs before trying to use other tools.",
+  {
+    port: z.string().optional().describe("Optional. The serial port to use for the Notecard. If provided, port scanning and VID checks will be skipped."),
+  },
+  async (input: { port?: string }) => {
     discoveredNotecardPort = null; // Reset port before scanning
+
+    if (input.port) {
+      discoveredNotecardPort = input.port;
+      console.error(`Using specified Notecard port: ${input.port}`);
+      return { content: [{ type: 'text', text: `Using specified Notecard port: ${input.port}` }] };
+    }
+
     try {
       console.error(`Scanning for serial ports...`);
       const ports = await SerialPort.list();
@@ -111,13 +89,14 @@ server.tool(
 
 server.tool(
   "notecard-request",
-  "Send a JSON request to a Notecard using 'notecard -req'. Uses previously found port if 'notecard' argument is omitted. Use the notecard-list-apis tool to see available APIs; Do this before using notecard-request.",
+  "Send a JSON request to a Notecard using 'notecard -req'. Uses previously found port if 'notecard' argument is omitted. ALWAYS run the 'notecard-list-apis' tool at least once before using 'notecard-request', to ensure the request is valid and compatible with the Notecard API.",
   {
     notecard: z.string().optional().describe("Optional: USB port of the Notecard. If omitted, uses port found by 'notecard-find-port'."),
     request: z.string().describe("The JSON request string to send, e.g. '{\"req\":\"card.version\"}', '{\"req\":\"card.wifi\",\"ssid\":\"mySSID\",\"pass\":\"myPassword\"}'")
   },
   async (input: { notecard?: string, request: string }) => {
     const { request } = input;
+
     let portToUse: string | null = input.notecard || discoveredNotecardPort;
 
     if (!portToUse) {
